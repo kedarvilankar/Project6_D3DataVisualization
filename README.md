@@ -15,11 +15,15 @@ After the animation is over, four clickable buttons are added to the page for us
 I posted my first draft of the visualization on the forums for the feedback. Following is the link to the forum: 
 https://discussions.udacity.com/t/feedback-on-the-visualization-made-for-the-project/219566?u=kedarpv
 I received two feedbacks on the forum and one feedback from a friend, they are as follows:
+
 Feedback 1:
+
 •	I don't know what the size of the bubble means
 •	The center of the bubbles seems a bit off from the axes
 •	Style the axes a bit so they are less visually prominent
+
 Feedback 2:
+
 Using D3 is very hard. Dimple.js is much easier.
 I suggest:
 •	I think it is no need to using animation. Because there is no sequence between every chart.
@@ -30,6 +34,7 @@ I suggest:
 hope it help.
 
 Feedback 3 (from a friend):
+
 •	Add grid lines to x-axis for users to easily associate a circle to the corresponding age group.
 
 Based on the feedbacks I made the changes to the visualization, however I did not remove the animation as one of the feedback suggested. I wanted to keep the animation because I feel it gives a preview of all the possible plots a user can see and then the user is free to interact with any of the plots. The following is the link to the gist of the new visualization. 
