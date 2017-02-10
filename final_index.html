@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://dimplejs.org/dist/dimple.v2.0.0.min.js"></script>
+    <style>
+      h2 {
+        text-align: center;
+      }
+      circle.male {
+        fill: orange;
+        stroke: black;
+        stroke-width: 0.7;
+        opacity: 0.7;
+      }
+      circle.female {
+        fill: green;
+        stroke: black;
+        stroke-width: 0.7;
+        opacity: 0.7;
+      }
+      circle.passengerSize {
+        fill: gray;
+        stroke: black;
+        stroke-width: 0.7;
+        opacity: 0.7;
+      }
+      div.class_buttons {
+        position: fixed;
+        top: 5px;
+        left: 10px;
+        cursor: pointer; cursor: hand; 
+      }
+
+      div.class_buttons div {
+        background-color: rgb(251, 201, 127);
+        padding: 3px;
+        margin: 7px;
+      }
+      line.bbox {
+        stroke-width:2;
+        stroke: black;
+      }
+      line.group_line {
+        stroke-width:1;
+        stroke: black;
+        opacity: 0.3;
+      }
+      g.x_axis{
+        opacity: 0.6;
+      }
+      g.y_axis{
+        opacity: 0.6;
+      }
+    </style>
+    <script type="text/javascript">
+
+    function draw(data){
+
+       /*
+        D3.js setup code
+      */
+
+          "use strict";
+          var margin = 100,
+              width = 1400 - margin,
+              height = 600 - margin;
+
+          var legend_radius = 15;
+          var color = "blue";
+          
+          d3.select("body")
+            .append("h2")
+            .text("Probability of survival on Titanic"); 
+
+          var svg = d3.select("body")
+            .append("svg")
+              .attr("width", width + margin)
+              .attr("height", height + margin)
+            .append('g')
+                .attr('class','chart');
+
+
+
+     
+      function key_func(d) {
+                return d['key'];
+            }
+
+      //aggregating function to compute probaility of survival      
+      function agg_on_age_group(leaves){
+      	var survival_rate = d3.mean(leaves,function(d){
+      		return d['Survived'];
+      	});
+
+
+      	return {
+                  'survival_rate' : survival_rate,
+                  'number_of_passengers' : leaves.length
+                };
+      }
+
+      //nest data to group data by age group, Pclass and Sex
+      var nested = d3.nest()
+                           .key(function(d) {
+                              return d['Age_group'];
+                           })
+                           .key(function(d) {
+                              return d['Pclass'];
+                           })
+                           .key(function(d) {
+                              return d['Sex'];
+                           })
+                           .rollup(agg_on_age_group)
+                           .entries(data);
+
+
+    //Reorganize data to make it easy fro plotting purposes                           
+    var reorganized_data_perClass = [];  
+    
+    for(var i=0;i<nested.length;i++){
+    	var d = nested[i];
+    	var age_group = d['key'];
+    	for(var class_itr=0;class_itr<d.values.length;class_itr++){
+    		var d_class = d.values[class_itr];
+    		var Pclass = d_class['key'];
+			for(var sex_itr=0;sex_itr<d_class.values.length;sex_itr++){
+				var d_class_sex = d_class.values[sex_itr];
+				console.log(age_group)
+				var sex = d_class_sex['key'];
+				var keyString = "";
+				reorganized_data_perClass.push({
+    			key: keyString.concat(age_group, '_Pclas_', Pclass, '_sex_', sex),
+    			value: {'age_group':age_group, 'Pclass':Pclass, 
+    					'sex':sex, 'number_of_passengers': d_class_sex.values['number_of_passengers'],
+    					'survival_rate':d_class_sex.values['survival_rate']}
+    			});
+			}	
+    		
+    	}
+
+    }                 
+
+    // nest data to group by age group and sex
+    var nested = d3.nest()
+                           .key(function(d) {
+                              return d['Age_group'];
+                           })
+                           .key(function(d) {
+                              return d['Sex'];
+                           })
+                           .rollup(agg_on_age_group)
+                           .entries(data);
+
+    //Reorganize data to make it easy fro plotting purposes                           
+    var reorganized_data_overall = [];  
+    for(var i=0;i<nested.length;i++){
+    	var d = nested[i];
+    	var age_group = d['key'];
+    	for(var sex_itr=0;sex_itr<d.values.length;sex_itr++){
+
+    		var d_sex = d.values[sex_itr];
+    		var sex = d_sex['key'];
+    		var keyString = "";
+				reorganized_data_overall.push({
+    			key: keyString.concat(age_group, '_sex_', sex),
+    			value: {'age_group':age_group, 'sex':sex, 
+    					'number_of_passengers': d_sex.values['number_of_passengers'],
+    					'survival_rate':d_sex.values['survival_rate']}
+    			});
+    	}
+    }
+        
+                         
+    //Find max number of passengers                          
+    var number_of_passengers_max = d3.max(reorganized_data_perClass, function(d) { 
+                return d.value['number_of_passengers'];
+            });
+
+    //make radius scale for circles
+      var radius = d3.scale.sqrt()
+                           .domain([0, number_of_passengers_max])
+                           .range([0, 25]);
+
+    // Create x-axis scale mapping Age_group -> pixels
+      var x = d3.scale.ordinal()
+    				.domain(["0-10", "10-20", "20-30", "30-40", "40-50", "50-60", "60-70", "70-80", "80-90", "90-100"])
+    				.rangeBands([margin, width],0.3);
+    // Create y-axis scale mapping survival rate -> pixels
+   	  var y = d3.scale.linear()
+   	  				.domain([0,1])
+   	  				.range([height,margin])
+     
+
+      // plot axes on the page              
+      var x_axis = d3.svg.axis()
+            .scale(x)
+            .orient("bottom");
+
+      var y_axis = d3.svg.axis()
+            .scale(y)
+            .orient("left");
+
+      d3.select("svg")
+            .append("g")
+            .attr("class", "x_axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(x_axis)
+      d3.select("svg")      
+            .append("text")
+            .attr("text-anchor", "middle") 
+            .attr("transform", "translate(" +width/2+"," + (height+(margin/2)) + ")")
+            .text("Age Group");
+
+      d3.select("svg")
+            .append("g")
+            .attr("class", "y_axis")
+            .attr("transform", "translate(" + margin + ",0)")
+            .call(y_axis);
+      d3.select("svg")      
+            .append("text")
+            .attr("text-anchor", "middle") 
+            .attr("transform", "translate(" +margin/2+"," + (height/2) + ")rotate(-90)")
+            .text("Probability of survival");
+
+
+      //plot circles for overall survival rate
+      svg.append('g')
+               .attr("class", "bubble")
+               .selectAll("circle")
+               .data(reorganized_data_overall, key_func)
+               .enter()
+               .append("circle")
+               .attr("class", function(d){
+                  if (d.value['sex']==="male"){ return "male";}
+                  else{ return "female"; }
+               })
+               .attr('cx', function(d) { 
+                  return 40+x(d.value['age_group']);
+                })
+               .attr('cy', function(d) { return y(d.value['survival_rate']); })
+               .attr('r', function(d) {
+                    return radius(d.value['number_of_passengers']);
+               });             
+
+      //add X axis grid lines               
+      var ageGroups = ["10-20","20-30","30-40","40-50","50-60", "60-70", "70-80","80-90","90-100"];
+      svg.append('g')
+          .selectAll("line")
+          .data(ageGroups)
+          .enter()
+          .append("line")
+          .attr("class","group_line")
+          .attr('x1', function(d) { 
+                  return x(d)-margin/4;
+                })
+          .attr("y1",y(0))
+          .attr('x2', function(d) { 
+                  return x(d)-margin/4;
+                })
+          .attr("y2",y(1));
+
+      //Add legend to the plot
+      var legend = d3.select("svg")
+                      .append("g")
+                      .attr("class", "legend")
+                      .attr("transform", "translate(" + (width - 100) + "," + 20 + ")")
+                      .selectAll("g")
+                      .data(["Male", "Female", "10", "30", "50"])
+                      .enter().append("g");
+
+
+      legend.append("circle")  
+              .attr("class", function(d){
+                  if (d==="Male"){ return "male";}
+                  else if (d==="Female"){ return "female"; }
+                  else {return "passengerSize";}
+               })
+              .attr("cy", function(d, i) {
+                if (d=="Male" || d=="Female"){
+                  return i * margin/3;
+                }else{
+                  return (i * margin/3)+10;
+                }
+              })
+              .attr("r", function(d){
+                if (d=="Male" || d=="Female"){
+                return legend_radius;
+                }
+                else {return radius(+d)}
+              })
+              debugger;
+      legend.append("text")
+              .attr("y", function(d, i) {
+                if (d=="Male" || d=="Female"){
+                  return i * margin/3 + 5;
+                }else{
+                  return (i * margin/3)+15;
+                }
+              })
+              .attr("x", legend_radius * 3)
+              .text(function(d) {
+                  return d;
+              });
+                 
+
+	    // legend bounding box               
+      d3.select("svg")
+        .append("line")
+        .attr("class","bbox")
+        .attr("x1",width-125)
+        .attr("y1",185)
+        .attr("x2",width)
+        .attr("y2",185); 
+      d3.select("svg")
+        .append("line")
+        .attr("class","bbox")
+        .attr("x1",width-125)
+        .attr("y1",70)
+        .attr("x2",width)
+        .attr("y2",70);
+      d3.select("svg")
+        .append("line")
+        .attr("class","bbox")
+        .attr("x1",width-125)
+        .attr("y1",2)
+        .attr("x2",width)
+        .attr("y2",2); 
+      d3.select("svg")
+        .append("line")
+        .attr("class","bbox")
+        .attr("x1",width-125)
+        .attr("y1",2)
+        .attr("x2",width-125)
+        .attr("y2",185);
+      d3.select("svg")
+        .append("line")
+        .attr("class","bbox")
+        .attr("x1",width)
+        .attr("y1",2)
+        .attr("x2",width)
+        .attr("y2",185);
+      d3.select("svg")
+        .append("text")
+        .attr("x",width-120)
+        .attr("y",85)
+        .text("No. of passengers")
+
+
+     //update plot for each class   
+     function update(pclass) {
+     	if (pclass=="0"){
+     		var filtered = reorganized_data_overall;
+        d3.select("h2")
+          .text("Probability of survival on Titanic");
+     	}
+     	else{
+     		var filtered = reorganized_data_perClass.filter(function(d) {
+                  return d.value['Pclass'] === pclass;
+              });
+        d3.select("h2")
+          .text("Probability of survival on Titanic passenger class: " + pclass);
+     	}
+     	
+     	var circles = svg.selectAll('circle')
+                          .data(filtered, key_func);
+
+        circles.exit().remove();
+
+        circles.enter()
+               .append("circle")
+               .transition()
+               .duration(500)
+               .attr("class", function(d){
+               		if (d.value['sex']==="male"){ return "male";}
+               		else{ return "female"; }
+               })
+               .attr('cx', function(d) { 
+               		return 40+x(d.value['age_group']);
+               	})
+               .attr('cy', function(d) { return y(d.value['survival_rate']); })
+               .attr('r', function(d) {
+                    return radius(d.value['number_of_passengers']);
+               });
+     }
+
+     var updateClass = ["0","1","2","3"];
+     class_itr = 0;
+
+     //animation
+     var class_interval = setInterval(function() {
+            update(updateClass[class_itr]);
+            class_itr++;
+
+            if(class_itr >= updateClass.length) {
+                clearInterval(class_interval);
+
+                var buttons = d3.select("body")
+                        .append("div")
+                        .attr("class", "class_buttons")
+                        .selectAll("div")
+                        .data(updateClass)
+                        .enter()
+                        .append("div")
+                        .text(function(d) {
+                            if(d=="0"){
+                            	return "Overall"
+                            }
+                            else{
+                            	return "Class" + d
+                            }
+                        });
+
+                buttons.on("click", function(d) {
+                    d3.select(".class_buttons")
+                      .selectAll("div")
+                      .transition()
+                      .duration(500)
+                      .style("color", "black")
+                      .style("background", "rgb(251, 201, 127)");
+
+                    d3.select(this)
+                      .transition()
+                      .duration(500)
+                      .style("background", "lightBlue")
+                      .style("color", "white");
+                    update(d);
+                });
+            }
+
+        },1000);
+
+    };
+    </script>
+
+  </head>
+
+  <body>
+
+  	<script type="text/javascript">
+    // read data and add new column representing age group
+  	d3.csv('data/titanic_data.csv', function(d){
+  		age = +d['Age'];
+  		if (age<=0){
+  			return;
+  		}
+  		else if (age<10){
+        	age_group = '0-10';
+  		}
+    	else if (age<20){
+        	age_group = '10-20';
+    	}
+    	else if (age<30){
+        	age_group = '20-30';
+        }
+    	else if (age<40){
+        	age_group = '30-40';
+        }
+    	else if (age<50){
+        	age_group = '40-50';
+        }
+    	else if (age<60){
+        	age_group = '50-60';
+        }
+    	else if (age<70){
+        	age_group = '60-70';
+        }
+    	else if (age<80){
+        	age_group = '70-80';
+        }
+    	else if (age<90){
+        	age_group = '80-90';
+        }
+    	else if (age<100){
+        	age_group = '90-100';
+        }
+    	else{
+        	age_group = '100-110';
+    	}
+    	d['Age_group'] = age_group;
+    	return d;
+  	},draw);
+
+  	
+  	</script>
+  </body>
